@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>정밀 정렬 프리미엄 장기</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #11141a;
+            color: #e0e6ed;
+            margin-top: 15px;
+            user-select: none;
+            overflow-x: hidden;
+            transition: background-color 0.3s;
+        }
+        body.check-alarm { background-color: #3a1111; }
+        
+        h1 {
+            color: #f1c40f; margin: 0 0 10px 0; font-size: 2rem;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.4); font-weight: 900;
+        }
+        
+        #menu {
+            background: #1e2430; padding: 12px 25px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 15px;
+            display: flex; gap: 15px; align-items: center; justify-content: center;
+            border: 1px solid #2c374e;
+        }
+        select, button {
+            padding: 6px 12px; font-size: 0.95rem; border-radius: 6px;
+            background: #11141a; color: #fff; border: 1px solid #4f5e7d; outline: none;
+        }
+        button {
+            background: linear-gradient(135deg, #e67e22, #d35400);
+            color: white; border: none; cursor: pointer; font-weight: bold;
+            box-shadow: 0 2px 8px rgba(230,126,34,0.4);
+        }
+
+        #turn-indicator {
+            font-size: 1.3rem; margin-bottom: 15px; font-weight: bold;
+            padding: 6px 25px; border-radius: 30px; background: #1e2430;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4); border: 1px solid #2c374e;
+        }
+
+        /* 🪵 럭셔리 다크 우드 판 - 내부 여백 구조 완전 캡슐화 */
+        #board-container {
+            width: 580px; height: 640px;
+            background: radial-gradient(circle, #2a1b10 0%, #110905 100%);
+            border: 16px solid #321e11; border-radius: 8px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.9), inset 0 0 30px rgba(0,0,0,1);
+            position: relative; box-sizing: border-box;
+        }
+
+        /* 선 레이어 - 컨테이너의 크기에 맞춰 정확히 안쪽 여백 반영 */
+        #svg-layer {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 1; pointer-events: none;
+        }
+
+        /* 🎯 노드 레이어 - SVG의 선 좌표와 100% 동일하게 일치하도록 유도 */
+        #node-layer {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 2;
+        }
+
+        /* 교차점 정중앙 배치용 트리거 노드 */
+        .node-trigger {
+            position: absolute;
+            width: 54px; height: 54px;
+            transform: translate(-50%, -50%);
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; z-index: 5;
+            border-radius: 50%;
+        }
+
+        /* 🎴 입체 3D 장기알 디자인 */
+        .piece {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; font-size: 1.25rem;
+            background: linear-gradient(135deg, #ebd1a7 0%, #ba9966 100%);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.7), inset 0 -3px 5px rgba(0,0,0,0.4);
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.3);
+            pointer-events: none;
+            transition: transform 0.1s;
+        }
+        
+        .piece.cho { color: #07463a; border: 2.5px solid #0d6b59; }
+        .piece.han { color: #6e1c14; border: 2.5px solid #a62b1f; }
+        
+        /* 알 크기 서열화 */
+        .piece.king { width: 53px; height: 53px; font-size: 1.4rem; border-width: 3.5px; }
+        .piece.sa { width: 40px; height: 40px; font-size: 1.05rem; }
+
+        /* 장군 상태의 왕 애니메이션 */
+        .piece.king.in-check { animation: pulse-red 0.8s infinite alternate; border-color: #e74c3c !important; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 5px #e74c3c, inset 0 0 5px #e74c3c; }
+            100% { box-shadow: 0 0 25px #e74c3c, inset 0 0 15px #e74c3c; }
+        }
+
+        /* 선택 이펙트 */
+        .node-trigger.selected .piece {
+            transform: scale(1.1);
+            outline: 3px solid #3498db;
+            box-shadow: 0 0 20px #3498db, 0 8px 15px rgba(0,0,0,0.6);
+        }
+        
+        /* 🟢 이동 점 안내 파트 */
+        .movable-dot {
+            position: absolute; width: 14px; height: 14px;
+            background-color: #2ecc71; border-radius: 50%; z-index: 10;
+            pointer-events: none; border: 2px solid #111;
+            box-shadow: 0 0 8px #2ecc71;
+        }
+        .movable-dot.capture {
+            background-color: #e74c3c; box-shadow: 0 0 10px #e74c3c;
+            width: 16px; height: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PREMIUM JANGGI</h1>
+    
+    <div id="menu">
+        <div>
+            <label for="gameMode">🎮 대국 모드: </label>
+            <select id="gameMode">
+                <option value="vsAi" selected>로봇과 대전 (VS AI)</option>
+                <option value="vsHuman">사람과 대전 (2인용)</option>
+            </select>
+        </div>
+        <div id="difficulty-area">
+            <label for="difficulty">🤖 로봇 등급: </label>
+            <select id="difficulty">
+                <option value="easy">🥉 초급</option>
+                <option value="normal" selected>🥈 중급</option>
+                <option value="hard">🥇 고급</option>
+            </select>
+        </div>
+        <button id="startBtn" onclick="startGame()">▶️ 대국 시작</button>
+    </div>
+
+    <div id="turn-indicator">대기 중... 대국 시작을 눌러주세요.</div>
+    
+    <div id="board-container">
+        <svg id="svg-layer"></svg>
+        <div id="node-layer"></div>
+    </div>
+
+    <script>
+        // 초기 기물 배치 (0번 행이 한나라 진영, 9번 행이 초나라 진영)
+        const initialLayout = [
+            ['cha','ma','sang','sa',null,'sa','sang','ma','cha'], 
+            [null,null,null,null,'king',null,null,null,null],
+            [null,'po',null,null,null,null,null,'po',null],
+            ['byeong',null,'byeong',null,'byeong',null,'byeong',null,'byeong'],
+            [null,null,null,null,null,null,null,null,null],
+            [null,null,null,null,null,null,null,null,null],
+            ['byeong',null,'byeong',null,'byeong',null,'byeong',null,'byeong'],
+            [null,'po',null,null,null,null,null,'po',null],
+            [null,null,null,null,'king',null,null,null,null],
+            ['cha','ma','sang','sa',null,'sa','sang','ma','cha']  
+        ];
+
+        let boardState = Array(10).fill(null).map(() => Array(9).fill(null));
+        const pieceNames = { 'cha': '車', 'ma': '馬', 'sang': '象', 'sa': '士', 'king': '楚', 'po': '包', 'byeong': '卒' };
+        const pieceValues = { 'king': 1000, 'cha': 13, 'po': 7, 'ma': 5, 'sang': 3, 'sa': 3, 'byeong': 2 };
+
+        let gameActive = false;
+        let currentTurn = 'cho';
+        let selectedCell = null;
+        let isAiThinking = false;
+
+        // 📐 [오차 수정 완결판] 외부 보더라인 안쪽으로 정확히 밀어 넣는 보정 좌표식
+        const totalPadX = 35; // 보더 안쪽에서 0번선이 시작될 절대 가로 오프셋
+        const totalPadY = 38; // 보더 안쪽에서 0번선이 시작될 절대 세로 오프셋
+        const gridW = 478;    // 격자선들의 실제 총 가로 드로잉 공간 너비 
+        const gridH = 532;    // 격자선들의 실제 총 세로 드로잉 공간 높이
+        const xStep = gridW / 8; 
+        const yStep = gridH / 9;
+
+        const nodeLayer = document.getElementById('node-layer');
+        const svgLayer = document.getElementById('svg-layer');
+        const turnIndicatorEl = document.getElementById('turn-indicator');
+        const gameModeSelect = document.getElementById('gameMode');
+        const difficultySelect = document.getElementById('difficulty');
+        const difficultyArea = document.getElementById('difficulty-area');
+        const startBtn = document.getElementById('startBtn');
+
+        gameModeSelect.addEventListener('change', () => {
+            difficultyArea.style.display = (gameModeSelect.value === 'vsHuman') ? 'none' : 'block';
+        });
+
+        // 📐 보정된 정밀 격자선 그리기
+        function drawBoardLines() {
+            svgLayer.innerHTML = '';
+            let html = '';
+            const lineColor = "#ad8654";
+            const lineW = "1.8";
+
+            // 가로선 10개
+            for(let i=0; i<10; i++) {
+                let y = totalPadY + i * yStep;
+                html += `<line x1="${totalPadX}" y1="${y}" x2="${gridW + totalPadX}" y2="${y}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
+            }
+            // 세로선 9개
+            for(let i=0; i<9; i++) {
+                let x = totalPadX + i * xStep;
+                html += `<line x1="${x}" y1="${totalPadY}" x2="${x}" y2="${gridH + totalPadY}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
+            }
+
+            // 궁궐 대각선 (상단 漢 / 하단 楚)
+            html += `<line x1="${totalPadX + 3*xStep}" y1="${totalPadY}" x2="${totalPadX + 5*xStep}" y2="${totalPadY + 2*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
+            html += `<line x1="${totalPadX + 5*xStep}" y1="${totalPadY}" x2="${totalPadX + 3*xStep}" y2="${totalPadY + 2*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
+            html += `<line x1="${totalPadX + 3*xStep}" y1="${totalPadY + 7*yStep}" x2="${totalPadX + 5*xStep}" y2="${totalPadY + 9*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
+            html += `<line x1="${totalPadX + 5*xStep}" y1="${totalPadY + 7*yStep}" x2="${totalPadX + 3*xStep}" y2="${totalPadY + 9*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
+
+            // 화점 장식
+            function drawStar(cx, cy) { return `<circle cx="${cx}" cy="${cy}" r="4" fill="#f1c40f" opacity="0.8"/>`; }
+            const starPoints = [
+                [2,1], [2,7], [7,1], [7,7],
+                [3,0], [3,2], [3,4], [3,6], [3,8],
+                [6,0], [6,2], [6,4], [6,6], [6,8]
+            ];
+            starPoints.forEach(([r, c]) => { html += drawStar(totalPadX + c*xStep, totalPadY + r*yStep); });
+            svgLayer.innerHTML = html;
+        }
+
+        // 🎯 [정렬 해결] 기물이 놓일 수 있는 터치 트리거 좌표를 격자 교차점과 완벽 싱크로 배치
+        function initNodeDOM() {
+            nodeLayer.innerHTML = '';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const node = document.createElement('div');
+                    node.classList.add('node-trigger');
+                    node.dataset.row = r; 
+                    node.dataset.col = c;
+                    
+                    // 정확한 픽셀 매핑 연산
+                    node.style.left = `${totalPadX + c * xStep}px`;
+                    node.style.top = `${totalPadY + r * yStep}px`;
+
+                    node.addEventListener('click', onCellClick);
+                    nodeLayer.appendChild(node);
+                }
+            }
+        }
+
+        function startGame() {
+            gameActive = true; currentTurn = 'cho'; selectedCell = null; isAiThinking = false;
+            nodeLayer.style.pointerEvents = 'auto'; nodeLayer.style.opacity = '1';
+            startBtn.innerText = '🔄 새 대국 시작';
+            document.body.classList.remove('check-alarm');
+
+            boardState = Array(10).fill(null).map(() => Array(9).fill(null));
+            initNodeDOM();
+            drawBoardLines();
+
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    let pieceType = initialLayout[r][c];
+                    if (pieceType) {
+                        let team = (r < 5) ? 'han' : 'cho';
+                        let displayInit = pieceNames[pieceType];
+                        if (pieceType === 'king' && team === 'han') displayInit = '漢';
+                        if (pieceType === 'byeong' && team === 'han') displayInit = '兵';
+                        boardState[r][c] = { type: pieceType, team: team, text: displayInit };
+                    }
+                }
+            }
+            renderBoard();
+            updateTurnIndicator();
+        }
+
+        // 행마법 탐지 조건식 엔진
+        function isPhysicalValidMove(fromR, fromC, toR, toC, piece, state = boardState) {
+            const target = state[toR][toC];
+            if (target && target.team === piece.team) return false;
+
+            const dr = toR - fromR; const dc = toC - fromC;
+            const absDr = Math.abs(dr); const absDc = Math.abs(dc);
+
+            if (piece.type === 'byeong') {
+                const forward = (piece.team === 'cho') ? -1 : 1;
+                if (dr === forward && dc === 0) return true;
+                if (dr === 0 && absDc === 1) return true;
+                return false;
+            }
+
+            if (piece.type === 'king' || piece.type === 'sa') {
+                const inPalace = (r, c) => (c >= 3 && c <= 5) && ((r >= 0 && r <= 2) || (r >= 7 && r <= 9));
+                if (!inPalace(toR, toC)) return false;
+                if (absDr <= 1 && absDc <= 1) {
+                    if (absDr === 1 && absDc === 1) {
+                        if (piece.team === 'cho' && (fromR===8 && fromC===4)) return true;
+                        if (piece.team === 'cho' && (toR===8 && toC===4)) return true;
+                        if (piece.team === 'han' && (fromR===1 && fromC===4)) return true;
+                        if (piece.team === 'han' && (toR===1 && toC===4)) return true;
+                        return false;
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            if (piece.type === 'cha') {
+                if (fromR !== toR && fromC !== toC) return false;
+                return countObstacles(fromR, fromC, toR, toC, state) === 0;
+            }
+
+            if (piece.type === 'po') {
+                if (fromR !== toR && fromC !== toC) return false;
+                const obsCount = countObstacles(fromR, fromC, toR, toC, state);
+                if (obsCount !== 1) return false;
+
+                let screenPiece = getFirstObstacle(fromR, fromC, toR, toC, state);
+                if (screenPiece && screenPiece.type === 'po') return false;
+                if (target && target.type === 'po') return false;
+                return true;
+            }
+
+            if (piece.type === 'ma') {
+                if (absDr === 2 && absDc === 1) {
+                    if (state[fromR + dr/2][fromC] !== null) return false;
+                    return true;
+                }
+                if (absDr === 1 && absDc === 2) {
+                    if (state[fromR][fromC + dc/2] !== null) return false;
+                    return true;
+                }
+                return false;
+            }
+
+            if (piece.type === 'sang') {
+                if (absDr === 3 && absDc === 2) {
+                    let stepR = dr / 3; let stepC = dc / 2;
+                    if (state[fromR + stepR][fromC] !== null) return false;
+                    if (state[fromR + stepR*2][fromC + stepC] !== null) return false;
+                    return true;
+                }
+                if (absDr === 2 && absDc === 3) {
+                    let stepR = dr / 2; let stepC = dc / 3;
+                    if (state[fromR][fromC + stepC] !== null) return false;
+                    if (state[fromR + stepR][fromC + stepC*2] !== null) return false;
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+
+        // 장군 탐지 레이더
+        function isTeamInCheck(team, state = boardState) {
+            let kingPos = null;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (state[r][c] && state[r][c].type === 'king' && state[r][c].team === team) {
+                        kingPos = { r, c }; break;
+                    }
+                }
+                if (kingPos) break;
+            }
+            if (!kingPos) return false;
+
+            const enemyTeam = (team === 'cho') ? 'han' : 'cho';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const p = state[r][c];
+                    if (p && p.team === enemyTeam) {
+                        if (isPhysicalValidMove(r, c, kingPos.r, kingPos.c, p, state)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // 멍군 필터링 시스템
+        function isValidMove(fromR, fromC, toR, toC, piece) {
+            if (!isPhysicalValidMove(fromR, fromC, toR, toC, piece, boardState)) return false;
+
+            const nextState = boardState.map(row => [...row]);
+            nextState[toR][toC] = nextState[fromR][fromC];
+            nextState[fromR][fromC] = null;
+
+            if (isTeamInCheck(piece.team, nextState)) return false;
+            return true;
+        }
+
+        function countObstacles(fR, fC, tR, tC, state) {
+            let count = 0;
+            if (fR === tR) {
+                let min = Math.min(fC, tC), max = Math.max(fC, tC);
+                for (let c = min + 1; c < max; c++) if (state[fR][c]) count++;
+            } else {
+                let min = Math.min(fR, tR), max = Math.max(fR, tR);
+                for (let r = min + 1; r < max; r++) if (state[r][fC]) count++;
+            }
+            return count;
+        }
+
+        function getFirstObstacle(fR, fC, tR, tC, state) {
+            if (fR === tR) {
+                let min = Math.min(fC, tC), max = Math.max(fC, tC);
+                for (let c = min + 1; c < max; c++) if (state[fR][c]) return state[fR][c];
+            } else {
+                let min = Math.min(fR, tR), max = Math.max(fR, tR);
+                for (let r = min + 1; r < max; r++) if (state[r][fC]) return state[r][fC];
+            }
+            return null;
+        }
+
+        function onCellClick(e) {
+            if (!gameActive || isAiThinking) return;
+
+            const cell = e.currentTarget;
+            const r = parseInt(cell.dataset.row);
+            const c = parseInt(cell.dataset.col);
+            const piece = boardState[r][c];
+            const mode = gameModeSelect.value;
+
+            if (mode === 'vsAi' && currentTurn === 'han') return;
+
+            if (selectedCell) {
+                const sr = selectedCell.row; const sc = selectedCell.col;
+                const movingPiece = boardState[sr][sc];
+
+                if (sr === r && sc === c) { clearSelection(); removeHints(); return; }
+                
+                if (piece && piece.team === currentTurn) { 
+                    clearSelection(); removeHints();
+                    selectPiece(cell, r, c); 
+                    showMovableHints(r, c, movingPiece);
+                    return; 
+                }
+
+                if (!isValidMove(sr, sc, r, c, movingPiece)) return;
+
+                let gameOver = false;
+                if (piece && piece.type === 'king') gameOver = true;
+
+                boardState[r][c] = movingPiece;
+                boardState[sr][sc] = null;
+
+                renderBoard();
+                clearSelection();
+                removeHints();
+
+                if (gameOver) {
+                    endGame(currentTurn === 'cho' ? "초(Green) 대승리! 🎉" : "한(Red) 대승리! 🎉");
+                    return;
+                }
+
+                currentTurn = (currentTurn === 'cho') ? 'han' : 'cho';
+                checkGameStatusEffects();
+                
+                if (gameActive && mode === 'vsAi' && currentTurn === 'han') {
+                    isAiThinking = true;
+                    setTimeout(makeAiMove, 600);
+                }
+            } else {
+                if (piece && piece.team === currentTurn) {
+                    selectPiece(cell, r, c);
+                    showMovableHints(r, c, piece);
+                }
+            }
+        }
+
+        function checkGameStatusEffects() {
+            document.body.classList.remove('check-alarm');
+            document.querySelectorAll('.piece.king').forEach(k => k.classList.remove('in-check'));
+
+            if (isTeamInCheck(currentTurn, boardState)) {
+                document.body.classList.add('check-alarm');
+                for(let r=0; r<10; r++) {
+                    for(let c=0; c<9; c++) {
+                        if(boardState[r][c] && boardState[r][c].type==='king' && boardState[r][c].team===currentTurn) {
+                            const kingEl = document.querySelector(`.node-trigger[data-row='${r}'][data-col='${c}'] .piece`);
+                            if(kingEl) kingEl.classList.add('in-check');
+                        }
+                    }
+                }
+                updateTurnIndicator(true);
+                
+                if (getAllValidMoves(currentTurn).length === 0) {
+                    const winner = (currentTurn === 'cho') ? "한(Red)" : "초(Green)";
+                    endGame(`외통수(Checkmate)! 패배했습니다. ${winner} 승리! 🏆`);
+                }
+            } else {
+                updateTurnIndicator(false);
+            }
+        }
+
+        function showMovableHints(fromR, fromC, piece) {
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (isValidMove(fromR, fromC, r, c, piece)) {
+                        const targetNode = document.querySelector(`.node-trigger[data-row='${r}'][data-col='${c}']`);
+                        if (targetNode) {
+                            const hint = document.createElement('div');
+                            hint.classList.add('movable-dot');
+                            if (boardState[r][c]) hint.classList.add('capture');
+                            targetNode.appendChild(hint);
+                        }
+                    }
+                }
+            }
+        }
+
+        function removeHints() { document.querySelectorAll('.movable-dot').forEach(el => el.remove()); }
+
+        function makeAiMove() {
+            if (!gameActive) return;
+            const difficulty = difficultySelect.value;
+            const allMoves = getAllValidMoves('han');
+
+            if (allMoves.length === 0) {
+                if (isTeamInCheck('han', boardState)) {
+                    endGame("로봇이 외통수에 걸렸습니다! 초(유저) 승리! 🎉");
+                } else {
+                    endGame("로봇 기권. 초(유저) 승리! 🎉");
+                }
+                return;
+            }
+
+            let chosenMove = null;
+            if (difficulty === 'easy') {
+                chosenMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+            } else if (difficulty === 'normal') {
+                const captureMoves = allMoves.filter(m => m.targetPiece !== null);
+                chosenMove = captureMoves.length > 0 ? captureMoves[Math.floor(Math.random() * captureMoves.length)] : allMoves[Math.floor(Math.random() * allMoves.length)];
+            } else if (difficulty === 'hard') {
+                let bestScore = -9999; let bestMoves = [];
+                allMoves.forEach(move => {
+                    let score = 0;
+                    if (move.targetPiece) score += (pieceValues[move.targetPiece.type] || 0) * 10;
+                    score += (4 - Math.abs(4 - move.toC)) * 0.1;
+                    if (score > bestScore) { bestScore = score; bestMoves = [move]; }
+                    else if (score === bestScore) { bestMoves.push(move); }
+                });
+                chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+            }
+
+            if (chosenMove) {
+                const { fromR, fromC, toR, toC } = chosenMove;
+                const isKingCaptured = chosenMove.targetPiece && chosenMove.targetPiece.type === 'king';
+                
+                boardState[toR][toC] = boardState[fromR][fromC];
+                boardState[fromR][fromC] = null;
+                
+                renderBoard();
+                if (isKingCaptured) {
+                    endGame("로봇이 왕을 포획했습니다! 로봇(한) 승리 🤖");
+                    return;
+                }
+            }
+
+            isAiThinking = false;
+            currentTurn = 'cho';
+            checkGameStatusEffects();
+        }
+
+        function getAllValidMoves(team) {
+            let moves = [];
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const piece = boardState[r][c];
+                    if (piece && piece.team === team) {
+                        for (let tr = 0; tr < 10; tr++) {
+                            for (let tc = 0; tc < 9; tc++) {
+                                if (isValidMove(r, c, tr, tc, piece)) {
+                                    moves.push({ fromR: r, fromC: c, toR: tr, toC: tc, targetPiece: boardState[tr][tc] });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return moves;
+        }
+
+        function selectPiece(cell, r, c) {
+            selectedCell = { row: r, col: c };
+            cell.classList.add('selected');
+        }
+
+        function clearSelection() {
+            if (selectedCell) {
+                const prevNode = document.querySelector('.node-trigger.selected');
+                if (prevNode) prevNode.classList.remove('selected');
+                selectedCell = null;
+            }
+        }
+
+        function updateTurnIndicator(inCheck = false) {
+            if (!gameActive) return;
+            const mode = gameModeSelect.value;
+            let checkText = inCheck ? ` <span style="color:#e74c3c;">⚠️ [장군!!]</span>` : '';
+            
+            if (currentTurn === 'cho') {
+                turnIndicatorEl.innerHTML = `현재 턴: <span style="color:#2ecc71;">초 (Green) ${mode === 'vsAi' ? '- 유저 차례' : ''}</span>${checkText}`;
+            } else {
+                if (mode === 'vsAi') {
+                    turnIndicatorEl.innerHTML = `🤖 로봇 연산 중...${checkText}`;
+                } else {
+                    turnIndicatorEl.innerHTML = `현재 턴: <span style="color:#e74c3c;">한 (Red) - 차례</span>${checkText}`;
+                }
+            }
+        }
+
+        function renderBoard() {
+            const triggers = document.querySelectorAll('.node-trigger');
+            triggers.forEach(node => {
+                const existingPiece = node.querySelector('.piece');
+                if (existingPiece) existingPiece.remove();
+
+                const r = node.dataset.row; const c = node.dataset.col;
+                const piece = boardState[r][c];
+
+                if (piece) {
+                    const pieceEl = document.createElement('div');
+                    pieceEl.classList.add('piece', piece.team, piece.type);
+                    pieceEl.innerText = piece.text;
+                    node.appendChild(pieceEl);
+                }
+            });
+        }
+
+        function endGame(message) {
+            gameActive = false;
+            nodeLayer.style.pointerEvents = 'none';
+            turnIndicatorEl.innerHTML = `<span style="color:#f1c40f;"><b>대국 종료 - ${message}</b></span>`;
+            setTimeout(() => alert(message), 50);
+        }
+
+        initNodeDOM();
+        drawBoardLines();
+    </script>
+</body>
+</html>
