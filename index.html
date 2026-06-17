@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>정밀 정렬 프리미엄 장기</title>
+    <title>고지능 고급 AI 프리미엄 장기</title>
     <style>
         body {
             font-family: 'Malgun Gothic', sans-serif;
@@ -45,7 +45,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.4); border: 1px solid #2c374e;
         }
 
-        /* 🪵 럭셔리 다크 우드 판 - 내부 여백 구조 완전 캡슐화 */
+        /* 🪵 럭셔리 다크 우드 판 */
         #board-container {
             width: 580px; height: 640px;
             background: radial-gradient(circle, #2a1b10 0%, #110905 100%);
@@ -54,19 +54,16 @@
             position: relative; box-sizing: border-box;
         }
 
-        /* 선 레이어 - 컨테이너의 크기에 맞춰 정확히 안쪽 여백 반영 */
         #svg-layer {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%; z-index: 1; pointer-events: none;
         }
 
-        /* 🎯 노드 레이어 - SVG의 선 좌표와 100% 동일하게 일치하도록 유도 */
         #node-layer {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%; z-index: 2;
         }
 
-        /* 교차점 정중앙 배치용 트리거 노드 */
         .node-trigger {
             position: absolute;
             width: 54px; height: 54px;
@@ -91,7 +88,6 @@
         .piece.cho { color: #07463a; border: 2.5px solid #0d6b59; }
         .piece.han { color: #6e1c14; border: 2.5px solid #a62b1f; }
         
-        /* 알 크기 서열화 */
         .piece.king { width: 53px; height: 53px; font-size: 1.4rem; border-width: 3.5px; }
         .piece.sa { width: 40px; height: 40px; font-size: 1.05rem; }
 
@@ -109,7 +105,7 @@
             box-shadow: 0 0 20px #3498db, 0 8px 15px rgba(0,0,0,0.6);
         }
         
-        /* 🟢 이동 점 안내 파트 */
+        /* 🟢 이동 점 안내 */
         .movable-dot {
             position: absolute; width: 14px; height: 14px;
             background-color: #2ecc71; border-radius: 50%; z-index: 10;
@@ -138,8 +134,8 @@
             <label for="difficulty">🤖 로봇 등급: </label>
             <select id="difficulty">
                 <option value="easy">🥉 초급</option>
-                <option value="normal" selected>🥈 중급</option>
-                <option value="hard">🥇 고급</option>
+                <option value="normal">🥈 중급</option>
+                <option value="hard" selected>🥇 고급 (고지능)</option>
             </select>
         </div>
         <button id="startBtn" onclick="startGame()">▶️ 대국 시작</button>
@@ -153,7 +149,6 @@
     </div>
 
     <script>
-        // 초기 기물 배치 (0번 행이 한나라 진영, 9번 행이 초나라 진영)
         const initialLayout = [
             ['cha','ma','sang','sa',null,'sa','sang','ma','cha'], 
             [null,null,null,null,'king',null,null,null,null],
@@ -169,6 +164,8 @@
 
         let boardState = Array(10).fill(null).map(() => Array(9).fill(null));
         const pieceNames = { 'cha': '車', 'ma': '馬', 'sang': '象', 'sa': '士', 'king': '楚', 'po': '包', 'byeong': '卒' };
+        
+        // 💎 정밀 기물 점수 가치 (고급 자율 연산용 정적 점수표)
         const pieceValues = { 'king': 1000, 'cha': 13, 'po': 7, 'ma': 5, 'sang': 3, 'sa': 3, 'byeong': 2 };
 
         let gameActive = false;
@@ -176,11 +173,10 @@
         let selectedCell = null;
         let isAiThinking = false;
 
-        // 📐 [오차 수정 완결판] 외부 보더라인 안쪽으로 정확히 밀어 넣는 보정 좌표식
-        const totalPadX = 35; // 보더 안쪽에서 0번선이 시작될 절대 가로 오프셋
-        const totalPadY = 38; // 보더 안쪽에서 0번선이 시작될 절대 세로 오프셋
-        const gridW = 478;    // 격자선들의 실제 총 가로 드로잉 공간 너비 
-        const gridH = 532;    // 격자선들의 실제 총 세로 드로잉 공간 높이
+        const totalPadX = 35; 
+        const totalPadY = 38; 
+        const gridW = 478;    
+        const gridH = 532;    
         const xStep = gridW / 8; 
         const yStep = gridH / 9;
 
@@ -196,31 +192,26 @@
             difficultyArea.style.display = (gameModeSelect.value === 'vsHuman') ? 'none' : 'block';
         });
 
-        // 📐 보정된 정밀 격자선 그리기
         function drawBoardLines() {
             svgLayer.innerHTML = '';
             let html = '';
             const lineColor = "#ad8654";
             const lineW = "1.8";
 
-            // 가로선 10개
             for(let i=0; i<10; i++) {
                 let y = totalPadY + i * yStep;
                 html += `<line x1="${totalPadX}" y1="${y}" x2="${gridW + totalPadX}" y2="${y}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
             }
-            // 세로선 9개
             for(let i=0; i<9; i++) {
                 let x = totalPadX + i * xStep;
                 html += `<line x1="${x}" y1="${totalPadY}" x2="${x}" y2="${gridH + totalPadY}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
             }
 
-            // 궁궐 대각선 (상단 漢 / 하단 楚)
             html += `<line x1="${totalPadX + 3*xStep}" y1="${totalPadY}" x2="${totalPadX + 5*xStep}" y2="${totalPadY + 2*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
             html += `<line x1="${totalPadX + 5*xStep}" y1="${totalPadY}" x2="${totalPadX + 3*xStep}" y2="${totalPadY + 2*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
             html += `<line x1="${totalPadX + 3*xStep}" y1="${totalPadY + 7*yStep}" x2="${totalPadX + 5*xStep}" y2="${totalPadY + 9*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
             html += `<line x1="${totalPadX + 5*xStep}" y1="${totalPadY + 7*yStep}" x2="${totalPadX + 3*xStep}" y2="${totalPadY + 9*yStep}" stroke="${lineColor}" stroke-width="${lineW}"/>`;
 
-            // 화점 장식
             function drawStar(cx, cy) { return `<circle cx="${cx}" cy="${cy}" r="4" fill="#f1c40f" opacity="0.8"/>`; }
             const starPoints = [
                 [2,1], [2,7], [7,1], [7,7],
@@ -231,20 +222,15 @@
             svgLayer.innerHTML = html;
         }
 
-        // 🎯 [정렬 해결] 기물이 놓일 수 있는 터치 트리거 좌표를 격자 교차점과 완벽 싱크로 배치
         function initNodeDOM() {
             nodeLayer.innerHTML = '';
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 9; c++) {
                     const node = document.createElement('div');
                     node.classList.add('node-trigger');
-                    node.dataset.row = r; 
-                    node.dataset.col = c;
-                    
-                    // 정확한 픽셀 매핑 연산
+                    node.dataset.row = r; node.dataset.col = c;
                     node.style.left = `${totalPadX + c * xStep}px`;
                     node.style.top = `${totalPadY + r * yStep}px`;
-
                     node.addEventListener('click', onCellClick);
                     nodeLayer.appendChild(node);
                 }
@@ -277,7 +263,7 @@
             updateTurnIndicator();
         }
 
-        // 행마법 탐지 조건식 엔진
+        // 물리적 원초 행마 체크
         function isPhysicalValidMove(fromR, fromC, toR, toC, piece, state = boardState) {
             const target = state[toR][toC];
             if (target && target.team === piece.team) return false;
@@ -354,7 +340,7 @@
             return false;
         }
 
-        // 장군 탐지 레이더
+        // 특정 팀이 장군 상태인지 여부 반환
         function isTeamInCheck(team, state = boardState) {
             let kingPos = null;
             for (let r = 0; r < 10; r++) {
@@ -379,15 +365,15 @@
             return false;
         }
 
-        // 멍군 필터링 시스템
-        function isValidMove(fromR, fromC, toR, toC, piece) {
-            if (!isPhysicalValidMove(fromR, fromC, toR, toC, piece, boardState)) return false;
+        // 장군 규칙 강제성 검증
+        function isValidMove(fromR, fromC, toR, toC, piece, state = boardState) {
+            if (!isPhysicalValidMove(fromR, fromC, toR, toC, piece, state)) return false;
 
-            const nextState = boardState.map(row => [...row]);
+            const nextState = state.map(row => [...row]);
             nextState[toR][toC] = nextState[fromR][fromC];
             nextState[fromR][fromC] = null;
 
-            if (isTeamInCheck(piece.team, nextState)) return false;
+            if (isTeamInCheck(piece.team, nextState)) return false; 
             return true;
         }
 
@@ -486,7 +472,7 @@
                 }
                 updateTurnIndicator(true);
                 
-                if (getAllValidMoves(currentTurn).length === 0) {
+                if (getAllValidMoves(currentTurn, boardState).length === 0) {
                     const winner = (currentTurn === 'cho') ? "한(Red)" : "초(Green)";
                     endGame(`외통수(Checkmate)! 패배했습니다. ${winner} 승리! 🏆`);
                 }
@@ -513,10 +499,11 @@
 
         function removeHints() { document.querySelectorAll('.movable-dot').forEach(el => el.remove()); }
 
+        // 🧠 [핵심 인공지능 변경] 고지능 전술 연산 알고리즘
         function makeAiMove() {
             if (!gameActive) return;
             const difficulty = difficultySelect.value;
-            const allMoves = getAllValidMoves('han');
+            const allMoves = getAllValidMoves('han', boardState);
 
             if (allMoves.length === 0) {
                 if (isTeamInCheck('han', boardState)) {
@@ -528,20 +515,75 @@
             }
 
             let chosenMove = null;
+
             if (difficulty === 'easy') {
+                // 초급: 완전 무작위
                 chosenMove = allMoves[Math.floor(Math.random() * allMoves.length)];
-            } else if (difficulty === 'normal') {
+            } 
+            else if (difficulty === 'normal') {
+                // 중급: 잡을 기물이 있으면 잡고, 없으면 랜덤
                 const captureMoves = allMoves.filter(m => m.targetPiece !== null);
                 chosenMove = captureMoves.length > 0 ? captureMoves[Math.floor(Math.random() * captureMoves.length)] : allMoves[Math.floor(Math.random() * allMoves.length)];
-            } else if (difficulty === 'hard') {
-                let bestScore = -9999; let bestMoves = [];
+            } 
+            else if (difficulty === 'hard') {
+                // 🥇 고급 (고지능 정밀 전술 엔진): 1수 앞 최적 가치 시뮬레이션
+                let bestScore = -99999;
+                let bestMoves = [];
+
                 allMoves.forEach(move => {
                     let score = 0;
-                    if (move.targetPiece) score += (pieceValues[move.targetPiece.type] || 0) * 10;
-                    score += (4 - Math.abs(4 - move.toC)) * 0.1;
-                    if (score > bestScore) { bestScore = score; bestMoves = [move]; }
-                    else if (score === bestScore) { bestMoves.push(move); }
+
+                    // 1. 적 기물 획득 가치 (절대 우선)
+                    if (move.targetPiece) {
+                        score += (pieceValues[move.targetPiece.type] || 0) * 100;
+                    }
+
+                    // 2. 가상 시뮬레이션 실행 (내 수를 둔 뒤의 보드 상태)
+                    const simState = boardState.map(row => [...row]);
+                    simState[move.toR][move.toC] = simState[move.fromR][move.fromC];
+                    simState[move.fromR][move.fromC] = null;
+
+                    // 3. 전술적 가중치 패널티: 내 수를 두었더니 상대방에게 '장군' 기회를 내주는가? (함정 필터링)
+                    if (isTeamInCheck('cho', simState)) {
+                        score += 50; // 유저를 장군으로 몰아넣는 최우선 공격 포인트 가산
+                    }
+
+                    // 4. 안전 보강 검사: 이동 후 다음 유저 턴에 내가 역공당해 죽는 기물 총점 빼기
+                    let selfDangerLoss = 0;
+                    for (let r = 0; r < 10; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const userPiece = simState[r][c];
+                            if (userPiece && userPiece.team === 'cho') {
+                                // 유저가 다음 턴에 내 기물을 합법적으로 잡을 수 있는지 수집
+                                for (let tr = 0; tr < 10; tr++) {
+                                    for (let tc = 0; tc < 9; tc++) {
+                                        if (isPhysicalValidMove(r, c, tr, tc, userPiece, simState)) {
+                                            const myDeadPiece = simState[tr][tc];
+                                            if (myDeadPiece && myDeadPiece.team === 'han') {
+                                                let loss = (pieceValues[myDeadPiece.type] || 0) * 85;
+                                                if (loss > selfDangerLoss) selfDangerLoss = loss;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    score -= selfDangerLoss; // 위협 패널티 감산
+
+                    // 5. 진형 보너스 (중앙 지향 및 전진 배치 유도)
+                    score += (4 - Math.abs(4 - move.toC)) * 0.5; // 세로 중심선 선점
+                    score += (move.toR) * 0.2; // 한나라(상단) 기준 아래로 전진할수록 가산
+
+                    // 최고 점수 갱신
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMoves = [move];
+                    } else if (score === bestScore) {
+                        bestMoves.push(move);
+                    }
                 });
+
                 chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
             }
 
@@ -564,16 +606,16 @@
             checkGameStatusEffects();
         }
 
-        function getAllValidMoves(team) {
+        function getAllValidMoves(team, state) {
             let moves = [];
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 9; c++) {
-                    const piece = boardState[r][c];
+                    const piece = state[r][c];
                     if (piece && piece.team === team) {
                         for (let tr = 0; tr < 10; tr++) {
                             for (let tc = 0; tc < 9; tc++) {
-                                if (isValidMove(r, c, tr, tc, piece)) {
-                                    moves.push({ fromR: r, fromC: c, toR: tr, toC: tc, targetPiece: boardState[tr][tc] });
+                                if (isValidMove(r, c, tr, tc, piece, state)) {
+                                    moves.push({ fromR: r, fromC: c, toR: tr, toC: tc, targetPiece: state[tr][tc] });
                                 }
                             }
                         }
@@ -599,13 +641,13 @@
         function updateTurnIndicator(inCheck = false) {
             if (!gameActive) return;
             const mode = gameModeSelect.value;
-            let checkText = inCheck ? ` <span style="color:#e74c3c;">⚠️ [장군!!]</span>` : '';
+            let checkText = inCheck ? ` <span style="color:#e74c3c; font-weight:bold;">⚠️ [장군!!]</span>` : '';
             
             if (currentTurn === 'cho') {
                 turnIndicatorEl.innerHTML = `현재 턴: <span style="color:#2ecc71;">초 (Green) ${mode === 'vsAi' ? '- 유저 차례' : ''}</span>${checkText}`;
             } else {
                 if (mode === 'vsAi') {
-                    turnIndicatorEl.innerHTML = `🤖 로봇 연산 중...${checkText}`;
+                    turnIndicatorEl.innerHTML = `🤖 로봇(고급 AI) 연산 중...${checkText}`;
                 } else {
                     turnIndicatorEl.innerHTML = `현재 턴: <span style="color:#e74c3c;">한 (Red) - 차례</span>${checkText}`;
                 }
